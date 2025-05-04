@@ -6,8 +6,7 @@ today = datetime.date.today()
 
 df = pd.read_csv('/Users/franklin/Documents/git/data-eng/data-processing/storage/data2.csv')
 
-df = pd.DataFrame(df)
-#df.notnull().sum()
+#df.isnull().sum()
 columns_to_keep = ['Duration', 'Date', 'Pulse', 'Maxpulse']
 
 
@@ -15,31 +14,43 @@ columns_to_keep = ['Duration', 'Date', 'Pulse', 'Maxpulse']
 df = df[columns_to_keep]
 df.columns = df.columns.str.lower()
 
-# Replace the incorrect value 450 with 45
-df['duration'] = df['duration'].apply(lambda x: int(str(x)[:2]) if isinstance(x, int) and len(str(x)) == 3 else x)
-
-# Remove quotes in the date format
-df['date'] = df['date'].str.replace("'", "")
-
-# Fill missing dates with a default value
-df['date'] = df['date'].fillna(today.strftime('%Y/%m/%d'))
+def clean_duration(x):
+    # Fix values for example, 450 which should be 45. Less than 1 minute.
+    if isinstance(x, int) and len(str(x)) > 3:
+        return int(str(x)[:2])
+    return x
 
 # Normalize date formats
 def normalize_date(date):
-    date = str(date)
-    if len(date) == 8 and date.isdigit():  # Handle 'YYYYMMDD' format
+    if pd.isnull(date):
+        return today.strftime('%Y/%m/%d')
+    date = str(date).replace("'", "")
+    if len(date) == 8 and date.isdigit():
         return f"{date[:4]}/{date[4:6]}/{date[6:]}"
     return date
 
+# Replace the incorrect value 450 with 45
+df['duration'] = df['duration'].apply(clean_duration)
+
+# Normalize the date format
 df['date'] = df['date'].apply(normalize_date)
 
-# Convert to standard date format
+# Convert the date to datetime format and then to string
 df['date'] = pd.to_datetime(df['date'], format='%Y/%m/%d', errors='coerce').dt.strftime('%Y-%m-%d')
 
-print(df.value_counts())
+# Check for duplicates
+duplicates = df.duplicated()
+print(f"Number of duplicates: {duplicates.sum()}")
+
+# Remove duplicates
 df.drop_duplicates(inplace=True)
 
-#print(df)
+# Recalculate duplicates after dropping them
+duplicates = df.duplicated()
+print(f"Number of duplicates after drop: {duplicates.sum()}")
 
-print(df.value_counts())
-print(df.notnull().sum())
+
+# Check for missing values
+print(df.isnull().sum())
+
+print(df)
